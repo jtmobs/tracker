@@ -11,7 +11,11 @@ function initializeSession() {
     return sessionId;
 }
 
+<<<<<<< HEAD
 // Functions to generate a UUID
+=======
+// Function to generate a UUID
+>>>>>>> e5a80fb (tracker commit)
 function generateUuid() {
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
         let r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
