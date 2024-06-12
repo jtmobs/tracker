@@ -1,10 +1,10 @@
 // Base service path for sending data
-const servicePath = "https://collectdataapp-583785287d33.herokuapp.com/webPage";
+const servicePath = "https://collectdatav1-8xpil.ondigitalocean.app/webPage";
 let uuid;
-let path;
 
 // Function to send captured data to the server
 function saveData(data) {
+    console.log("Sending data:", data);
     const http = new XMLHttpRequest();
     http.open("POST", servicePath, true);
     http.setRequestHeader("Content-Type", "application/json");
@@ -17,7 +17,44 @@ function saveData(data) {
     http.send(JSON.stringify(data));
 }
 
-// Helper functions (getUrl, getCssSelectorPath, generateSelector, getAbsoluteXPath) need to be defined here
+// Record window size
+function recordWindowSize() {
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+
+    const data = {
+        sessionId: initializeSession(),
+        url: window.location.href,
+        eventType: 'windowResize',
+        pageStructure: document.documentElement.outerHTML,
+        tag: 'null',
+        xpath: 'null',
+        fullXpath: 'null',
+        cssPath: 'null',
+        width: width,
+        height: height,
+        timeStamp: Date.now()
+    };
+    saveData(data);
+}
+
+window.onload = recordWindowSize;
+window.onresize = recordWindowSize;
+
+// Event listener for page changes
+window.onpopstate = function(event) {
+    recordPageChange(event);
+};
+
+function recordPageChange(event) {
+    const data = {
+        sessionId: initializeSession(),
+        url: window.location.href,
+        eventType: 'pageChange',
+        timeStamp: Date.now()
+    };
+    saveData(data);
+}
 
 // Event listener for clicks
 document.addEventListener('click', function (event) {
@@ -28,11 +65,6 @@ document.addEventListener('click', function (event) {
 document.addEventListener('keydown', function (event) {
     recordEvent(event, 'keydown');
 }, true);
-
-// Event listener for mouseover
-// document.addEventListener('mouseover', function (event) {
-//   recordEvent(event, 'mouseover');
-// }, true);
 
 // Event listener for dragstart
 document.addEventListener('dragstart', function (event) {
@@ -46,6 +78,7 @@ document.addEventListener('drop', function (event) {
 
 // Function to handle and record different events
 function recordEvent(event, eventType) {
+    const rect = event.target.getBoundingClientRect();
     const targetElement = event.target;
     let data = {
         sessionId: initializeSession(),
@@ -55,18 +88,12 @@ function recordEvent(event, eventType) {
         timeStamp: event.timeStamp,
         tag: targetElement.tagName,
         targetId: targetElement.id,
-        //classes: targetElement.className,
+        classes: targetElement.getAttribute("class"),
         xpath: getAbsoluteXPath(targetElement),
-        fullXpath: getFullXPath(targetElement),
+        fullXpath: getRelativeXPath(targetElement),
         cssPath: getCssSelectorPath(targetElement),
         textContent: targetElement.textContent.trim().substring(0, 100), // Truncate long text
     };
-
-    // Include mouse position for relevant events
-    if (['click', 'mouseover', 'dragstart', 'drop'].includes(eventType)) {
-        data.mouseX = event.clientX;
-        data.mouseY = event.clientY;
-    }
 
     // Include key value for keydown events
     if (eventType === 'keydown') {
@@ -77,7 +104,14 @@ function recordEvent(event, eventType) {
     saveData(data);
 }
 
-// Implement the helper functions: getUrl, getCssSelectorPath, generateSelector, getAbsoluteXPath
+// Helper functions
+function getClickOffset(rect, offset) {
+    return {
+        x: Math.abs(offset.x - rect.left),
+        y: Math.abs(offset.y - rect.top),
+    };
+}
+
 function getCssSelectorPath(element) {
     if (!element.parentElement) {
         return element.tagName.toLowerCase();
@@ -103,7 +137,7 @@ function getAbsoluteXPath(element) {
         return element.tagName.toLowerCase();
     }
 
-    let ix = 0; // Position of the element among siblings
+    let ix = 0;
     const siblings = element.parentNode.childNodes;
     for (let i = 0; i < siblings.length; i++) {
         const sibling = siblings[i];
@@ -140,7 +174,6 @@ function generateUuid() {
     });
 }
 
-// Initialize session with UUID
 function initializeSession() {
     let sessionId = sessionStorage.getItem('uuid');
     if (!sessionId) {
@@ -174,7 +207,6 @@ function getFullXPath(element) {
     return xpath;
 }
 
-
 function getSelector(element) {
     const path = [];
     while (element.parentNode) {
@@ -198,7 +230,6 @@ function getSelector(element) {
     return path.join(' > ');
 }
 
-// Function to get XPath of an element
 function getXPath(element) {
     const idx = (sib, name) => sib
         ? idx(sib.previousElementSibling, name || sib.localName) + (sib.localName == name)
@@ -208,4 +239,40 @@ function getXPath(element) {
             ? `id("${element.id}")`
             : `${getXPath(element.parentNode)}/${element.tagName}[${idx(element)}]`)
         : '';
+}
+// Escape attribute value to safely include it in XPath
+function escapeAttributeValue(value) {
+    return value.replace(/'/g, "&apos;").replace(/"/g, "&quot;");
+}
+
+// Function to generate a relative XPath for an element
+function getRelativeXPath(element) {
+    const uniqueAttributes = ['id', 'name', 'class', 'type', 'value'];
+
+    // Check for unique attributes and form XPath
+    for (let attr of uniqueAttributes) {
+        const value = element.getAttribute(attr);
+        if (value) {
+            const xpath = `//*[@${attr}='${escapeAttributeValue(value)}']`;
+            const matchingElements = document.evaluate(xpath, document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
+            if (matchingElements.snapshotLength === 1) {
+                return xpath;
+            }
+        }
+    }
+
+    // Fallback: generate a relative XPath based on element's position within its siblings
+    let path = '';
+    for (; element && element.nodeType === Node.ELEMENT_NODE; element = element.parentNode) {
+        let siblingIndex = 1;
+        for (let sibling = element.previousSibling; sibling; sibling = sibling.previousSibling) {
+            if (sibling.nodeType === Node.DOCUMENT_TYPE_NODE) continue;
+            if (sibling.nodeType === Node.ELEMENT_NODE && sibling.nodeName === element.nodeName) {
+                siblingIndex++;
+            }
+        }
+        const nodeName = element.nodeName.toLowerCase();
+        path = '/' + nodeName + '[' + siblingIndex + ']' + path;
+    }
+    return '/' + path; // Modified to return relative XPath from the document's root
 }
