@@ -63,7 +63,12 @@ document.addEventListener('click', function (event) {
 
 // Event listener for keydown
 document.addEventListener('keydown', function (event) {
-    recordEvent(event, 'keydown');
+    // Ignore certain keys
+    const ignoredKeys = ['Backspace', 'Shift', 'Enter', 'Tab', 'CapsLock', 'Control', 'Alt', 'ArrowUp',
+        'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Escape', 'Delete'];
+    if (!ignoredKeys.includes(event.key)) {
+        recordEvent(event, 'keydown');
+    }
 }, true);
 
 // Event listener for dragstart
