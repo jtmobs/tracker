@@ -26,7 +26,7 @@ function recordWindowSize() {
         sessionId: initializeSession(),
         url: window.location.href,
         eventType: 'windowResize',
-        pageStructure: document.documentElement.outerHTML,
+        pageStructure: 'null',
         tag: 'null',
         xpath: 'null',
         fullXpath: 'null',
@@ -88,7 +88,7 @@ function recordEvent(event, eventType) {
     let data = {
         sessionId: initializeSession(),
         url: window.location.href,
-        pageStructure: document.documentElement.outerHTML,
+        pageStructure: 'null',
         eventType: eventType,
         timeStamp: event.timeStamp,
         tag: targetElement.tagName,
